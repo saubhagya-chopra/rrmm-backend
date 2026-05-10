@@ -2,7 +2,6 @@
  * POST /api/stripe/webhook
  * Handles Stripe events: payment succeeded → release content + payout photographer
  */
-import { buffer } from 'micro';
 import Stripe from 'stripe';
 import { supabaseAdmin } from '../../lib/supabase.js';
 import { initiatePhotographerPayout } from '../../lib/stripe.js';
@@ -15,7 +14,7 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).end();
 
-  const buf = await buffer(req);
+  const buf = await readRequestBuffer(req);
   const sig = req.headers['stripe-signature'];
 
   let event;
@@ -50,6 +49,16 @@ export default async function handler(req, res) {
   }
 
   return res.status(200).json({ received: true });
+}
+
+async function readRequestBuffer(req) {
+  const chunks = [];
+
+  for await (const chunk of req) {
+    chunks.push(typeof chunk === 'string' ? Buffer.from(chunk) : chunk);
+  }
+
+  return Buffer.concat(chunks);
 }
 
 async function handlePaymentSucceeded(paymentIntent) {
